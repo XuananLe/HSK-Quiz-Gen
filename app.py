@@ -3,7 +3,6 @@ from openai import OpenAI
 import instructor
 import os
 import base64
-from dotenv import load_dotenv
 from PIL import Image
 import io
 import re
@@ -16,10 +15,14 @@ def image_to_base64(image_file) -> str:
     """Convert uploaded image to base64"""
     return base64.b64encode(image_file.read()).decode("utf-8")
 
-load_dotenv()
+# Initialize OpenAI client with instructor using Streamlit secrets
+try:
+    api_key = st.secrets["openai"]["api_key"]
+except KeyError:
+    st.error("❌ OpenAI API key not found! Please configure it in Streamlit secrets.")
+    st.stop()
 
-# Initialize OpenAI client with instructor
-client = instructor.from_openai(OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
+client = instructor.from_openai(OpenAI(api_key=api_key))
 
 # Pydantic Models for structured data
 class QuestionType(str, Enum):
