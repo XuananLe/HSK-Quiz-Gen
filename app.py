@@ -417,7 +417,7 @@ def main():
                 mime="text/plain"
             )
     else:
-        st.info("👆 Tải lên hình ảnh và nhấn 'Tạo Quiz' để bắt đầu!")
+        st.info("Chopchop hoc tieng trung di")
 
 if __name__ == "__main__":
     main()
