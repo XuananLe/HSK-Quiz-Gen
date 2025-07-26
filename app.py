@@ -295,14 +295,14 @@ def main():
             if uploaded_files:
                 for i, uploaded_file in enumerate(uploaded_files):
                     image = Image.open(uploaded_file)
-                    st.image(image, caption=f"Ảnh {i+1}: {uploaded_file.name}", use_column_width=True)
+                    st.image(image, caption=f"Ảnh {i+1}: {uploaded_file.name}", use_container_width=True)
                     image_files.append(uploaded_file)
                 st.write(f"**Tổng cộng: {len(uploaded_files)} ảnh**")
             elif use_default:
                 try:
                     with open("A.jpg", "rb") as f:
                         image = Image.open("A.jpg")
-                        st.image(image, caption="Hình ảnh mẫu (A.jpg)", use_column_width=True)
+                        st.image(image, caption="Hình ảnh mẫu (A.jpg)", use_container_width=True)
                         # Reset file pointer for processing
                         image_files = [open("A.jpg", "rb")]
                 except FileNotFoundError:
