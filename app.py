@@ -270,7 +270,6 @@ def main():
     st.title("📚 Quiz Generator - Tiếng Trung")
     st.write("Tải lên một hoặc nhiều hình ảnh ghi chú tiếng Trung để tạo quiz tương tác!")
     st.write("**Format:** Hiển thị từ Hán → Học sinh điền pinyin + chọn nghĩa")
-    st.info("💡 **Mẹo:** Bạn có thể tải lên nhiều ảnh cùng lúc để tạo một bài quiz lớn từ nhiều trang ghi chú!")
     
     # Sidebar for file upload
     st.sidebar.header("🖼️ Tải lên hình ảnh")
@@ -323,10 +322,9 @@ def main():
                             quiz_data = generate_quiz_from_images(image_files)
                         
                         if quiz_data is None:
-                            st.error("❌ Không thể tạo quiz từ các ảnh đã tải!")
+                            st.error("Không thể tạo quiz từ các ảnh đã tải!")
                             return
                         
-                        # Store quiz data in session state
                         st.session_state.quiz_data = quiz_data
                         st.session_state.current_question = 0
                         st.session_state.score = 0
