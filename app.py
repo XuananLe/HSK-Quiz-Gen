@@ -262,12 +262,12 @@ def display_question(question: QuizQuestion, question_num: int) -> bool:
 
 def main():
     st.set_page_config(
-        page_title="Quiz Generator - Tiếng Trung",
+        page_title="Chopchop hoc tieng Trung di",
         page_icon="📚",
         layout="wide"
     )
     
-    st.title("📚 Quiz Generator - Tiếng Trung")
+    st.title("📚 Chopchop hoc tieng Trung di Quiz Generator")
     st.write("Tải lên một hoặc nhiều hình ảnh ghi chú tiếng Trung để tạo quiz tương tác!")
     st.write("**Format:** Hiển thị từ Hán → Học sinh điền pinyin + chọn nghĩa")
     
