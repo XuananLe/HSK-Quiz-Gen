@@ -1,0 +1,110 @@
+QUIZ TITLE: Quiz về Từ Vựng Tiếng Trung
+Total Questions: 10
+
+Question 1:
+Type: Trắc nghiệm nghĩa đúng
+Question: Từ '顺便' có nghĩa là gì?
+Options:
+  1. Thuận tiện thì
+  2. Thực tế
+  3. Tủ lạnh
+  4. Hiệu quả
+Answer: Thuận tiện thì
+Explanation: Từ '顺便' (shùnbiàn) là trạng từ chỉ sự thuận tiện.
+Category: multiple_choice
+----------------------------------------
+Question 2:
+Type: Trắc nghiệm chọn từ đúng theo nghĩa
+Question: Từ nào sau đây có nghĩa là 'mùi vị'?
+Options:
+  1. 制冷
+  2. 味道
+  3. 艺术
+  4. 邀请
+Answer: 味道
+Explanation: Từ '味道' (wèidào) có nghĩa là mùi vị.
+Category: multiple_choice
+----------------------------------------
+Question 3:
+Type: Chọn pinyin đúng
+Question: Pinyin của từ '效果' là gì?
+Options:
+  1. xiàoguǒ
+  2. shíjì
+  3. yìshù
+  4. bīngxiāng
+Answer: xiàoguǒ
+Explanation: Từ '效果' đọc là 'xiàoguǒ', có nghĩa là hiệu quả.
+Category: multiple_choice
+----------------------------------------
+Question 4:
+Type: Điền từ vào câu
+Question: Tôi muốn mua một cái _______ để bảo quản thực phẩm.
+Options:
+  1. 制冷
+  2. 冰箱
+  3. 艺术
+  4. 邀请
+Answer: 冰箱
+Explanation: '冰箱' (bīngxiāng) có nghĩa là tủ lạnh.
+Category: multiple_choice
+----------------------------------------
+Question 5:
+Type: Ghép từ với nghĩa
+Question: Hãy ghép từ với nghĩa đúng: '邀请', '广告', '艺术'
+Options:
+  1. Mời, Quảng cáo, Nghệ thuật
+  2. Nghệ thuật, Mời, Quảng cáo
+  3. Quảng cáo, Nghệ thuật, Mời
+Answer: Mời, Quảng cáo, Nghệ thuật
+Explanation: '邀请' là mời, '广告' là quảng cáo, '艺术' là nghệ thuật.
+Category: multiple_choice
+----------------------------------------
+Question 6:
+Type: Đúng/Sai nghĩa
+Question: '实际' có nghĩa là 'thực tế'.
+Options:
+  1. Đúng
+  2. Sai
+Answer: Đúng
+Explanation: '实际' (shíjì) có nghĩa là thực tế.
+Category: multiple_choice
+----------------------------------------
+Question 7:
+Type: Dịch từ Việt sang Hán
+Question: Dịch từ 'nho' sang tiếng Hán.
+Answer: 葡萄
+Explanation: 'Nho' trong tiếng Hán là '葡萄' (pútáo).
+Category: text_input
+----------------------------------------
+Question 8:
+Type: Sắp xếp lại pinyin đúng thứ tự
+Question: Sắp xếp lại pinyin của từ '制冷': 'lěng', 'zhì'
+Answer: zhì lěng
+Explanation: Từ '制冷' đọc là 'zhì lěng', có nghĩa là làm lạnh.
+Category: text_input
+----------------------------------------
+Question 9:
+Type: Trắc nghiệm chọn từ đúng theo nghĩa
+Question: Từ nào sau đây có nghĩa là 'quảng cáo'?
+Options:
+  1. 艺术
+  2. 广场
+  3. 广告
+  4. 效果
+Answer: 广告
+Explanation: Từ '广告' (guǎnggào) có nghĩa là quảng cáo.
+Category: multiple_choice
+----------------------------------------
+Question 10:
+Type: Trắc nghiệm nghĩa đúng
+Question: Từ '邀请' có nghĩa là gì?
+Options:
+  1. Thực tế
+  2. Quảng cáo
+  3. Mời
+  4. Nghệ thuật
+Answer: Mời
+Explanation: Từ '邀请' (yāoqǐng) có nghĩa là mời.
+Category: multiple_choice
+----------------------------------------
