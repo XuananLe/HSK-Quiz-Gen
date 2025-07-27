@@ -343,7 +343,6 @@ def main():
                 with st.spinner("Đang tạo quiz... Vui lòng đợi!"):
                     try:
                         num_images = len(uploaded_files) if uploaded_files else 1
-                        status_text.text(f"Đang xử lý {num_images} ảnh song song...")
                         
                         start_time = time.time()
                         
@@ -378,7 +377,6 @@ def main():
                         progress_bar.empty()
                         
                         st.success(f"✅ Quiz đã được tạo từ {num_images} ảnh với tổng cộng {len(quiz_data.questions)} câu hỏi!")
-                        st.info(f"⏱️ Thời gian xử lý: {processing_time:.1f} giây (xử lý song song)")
                         
                     except Exception as e:
                         progress_bar.empty()
