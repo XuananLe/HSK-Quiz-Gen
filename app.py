@@ -10,6 +10,8 @@ import random
 from typing import List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
+import concurrent.futures
+import time
 
 def image_to_base64(image_file) -> str:
     """Convert uploaded image to base64"""
@@ -97,69 +99,92 @@ class QuizData(BaseModel):
             return self.questions[index]
         return None
 
-def generate_quiz_from_images(image_files):
-    """Generate quiz from multiple images"""
-    all_quiz_data = []
-    
-    for i, image_file in enumerate(image_files):
-        try:
-            base64_img = image_to_base64(image_file)
+def generate_single_quiz(image_file, image_index):
+    """Generate quiz from a single image - helper function for parallel processing"""
+    try:
+        # Reset file pointer if needed
+        if hasattr(image_file, 'seek'):
+            image_file.seek(0)
             
-            quiz_data = client.chat.completions.create(
-                model="gpt-4o",
-                temperature=0.7,
-                max_tokens=2048,
-                response_model=QuizData,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": (
-                                    "Bạn là giáo viên tiếng Trung. Đây là ảnh chụp một trang ghi chú gồm từ Hán, pinyin, loại từ, và nghĩa tiếng Việt. "
-                                    "Hãy tạo 8–12 câu hỏi quiz theo format sau: "
-                                    "- Hiển thị từ tiếng Trung (Hán tự) "
-                                    "- Học sinh cần điền pinyin (text input) "
-                                    "- Học sinh chọn nghĩa đúng từ các lựa chọn (multiple choice) "
-                                    "Trả về dữ liệu có cấu trúc với: "
-                                    "- title: tên bài quiz (dựa trên nội dung ảnh) "
-                                    "- questions: danh sách câu hỏi, mỗi câu có: "
-                                    "  * id: số thứ tự "
-                                    "  * type: 'chinese_to_pinyin_meaning' "
-                                    "  * question: câu hỏi dạng 'Pinyin và nghĩa của từ [từ tiếng Trung] là gì?' "
-                                    "  * chinese_word: từ tiếng Trung (hiển thị cho học sinh) "
-                                    "  * pinyin: cách đọc pinyin đúng "
-                                    "  * meaning: nghĩa tiếng Việt đúng "
-                                    "  * wrong_meanings: 3-4 nghĩa sai để tạo multiple choice "
-                                    "  * explanation: giải thích thêm về từ (nếu có) "
-                                    "Ví dụ: question='Pinyin và nghĩa của từ 学生 là gì?', chinese_word='学生', pinyin='xuéshēng', meaning='học sinh', wrong_meanings=['giáo viên', 'bạn bè', 'gia đình']"
-                                )
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{base64_img}"
-                                }
+        base64_img = image_to_base64(image_file)
+        
+        quiz_data = client.chat.completions.create(
+            model="gpt-4o",
+            temperature=0.7,
+            max_tokens=2048,
+            response_model=QuizData,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Bạn là giáo viên tiếng Trung. Đây là ảnh chụp một trang ghi chú gồm từ Hán, pinyin, loại từ, và nghĩa tiếng Việt. "
+                                "Hãy tạo 8–12 câu hỏi quiz theo format sau: "
+                                "- Hiển thị từ tiếng Trung (Hán tự) "
+                                "- Học sinh cần điền pinyin (text input) "
+                                "- Học sinh chọn nghĩa đúng từ các lựa chọn (multiple choice) "
+                                "Trả về dữ liệu có cấu trúc với: "
+                                "- title: tên bài quiz (dựa trên nội dung ảnh) "
+                                "- questions: danh sách câu hỏi, mỗi câu có: "
+                                "  * id: số thứ tự "
+                                "  * type: 'chinese_to_pinyin_meaning' "
+                                "  * question: câu hỏi dạng 'Pinyin và nghĩa của từ [từ tiếng Trung] là gì?' "
+                                "  * chinese_word: từ tiếng Trung (hiển thị cho học sinh) "
+                                "  * pinyin: cách đọc pinyin đúng "
+                                "  * meaning: nghĩa tiếng Việt đúng "
+                                "  * wrong_meanings: 3-4 nghĩa sai để tạo multiple choice "
+                                "  * explanation: giải thích thêm về từ (nếu có) "
+                                "Ví dụ: question='Pinyin và nghĩa của từ 学生 là gì?', chinese_word='学生', pinyin='xuéshēng', meaning='học sinh', wrong_meanings=['giáo viên', 'bạn bè', 'gia đình']"
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{base64_img}"
                             }
-                        ]
-                    }
-                ]
-            )
-            all_quiz_data.append(quiz_data)
-        except Exception as e:
-            # Create error question for this image
-            error_question = QuizQuestion(
-                id=1,
-                type="error",
-                question=f"Lỗi khi tạo quiz từ ảnh {i+1}: {str(e)}",
-                chinese_word="N/A",
-                pinyin="N/A",
-                meaning="N/A",
-                wrong_meanings=[]
-            )
-            error_quiz = QuizData(questions=[error_question], title=f"Lỗi - Ảnh {i+1}")
-            all_quiz_data.append(error_quiz)
+                        }
+                    ]
+                }
+            ]
+        )
+        return quiz_data, image_index, None
+    except Exception as e:
+        # Create error question for this image
+        error_question = QuizQuestion(
+            id=1,
+            type="error",
+            question=f"Lỗi khi tạo quiz từ ảnh {image_index+1}: {str(e)}",
+            chinese_word="N/A",
+            pinyin="N/A",
+            meaning="N/A",
+            wrong_meanings=[]
+        )
+        error_quiz = QuizData(questions=[error_question], title=f"Lỗi - Ảnh {image_index+1}")
+        return error_quiz, image_index, str(e)
+
+def generate_quiz_from_images(image_files):
+    """Generate quiz from multiple images using parallel processing"""
+    if not image_files:
+        return None
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, len(image_files))) as executor:
+        future_to_index = {
+            executor.submit(generate_single_quiz, image_file, i): i 
+            for i, image_file in enumerate(image_files)
+        }
+        
+        results = {}
+        for future in concurrent.futures.as_completed(future_to_index):
+            quiz_data, image_index, error = future.result()
+            results[image_index] = quiz_data
+    
+    # Sort results by original image order
+    all_quiz_data = []
+    for i in range(len(image_files)):
+        if i in results:
+            all_quiz_data.append(results[i])
     
     # Combine all quiz data into one
     if not all_quiz_data:
@@ -311,8 +336,17 @@ def main():
         with col2:
             # Generate quiz button
             if st.button("🎯 Tạo Quiz", type="primary"):
+                # Show progress bar and status
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
                 with st.spinner("Đang tạo quiz... Vui lòng đợi!"):
                     try:
+                        num_images = len(uploaded_files) if uploaded_files else 1
+                        status_text.text(f"Đang xử lý {num_images} ảnh song song...")
+                        
+                        start_time = time.time()
+                        
                         # Reset file pointers if using uploaded files
                         if uploaded_files:
                             for uploaded_file in uploaded_files:
@@ -320,6 +354,11 @@ def main():
                             quiz_data = generate_quiz_from_images(uploaded_files)
                         else:
                             quiz_data = generate_quiz_from_images(image_files)
+                        
+                        end_time = time.time()
+                        processing_time = end_time - start_time
+                        
+                        progress_bar.progress(1.0)
                         
                         if quiz_data is None:
                             st.error("Không thể tạo quiz từ các ảnh đã tải!")
@@ -335,10 +374,15 @@ def main():
                             if key.startswith("options_"):
                                 del st.session_state[key]
                         
-                        num_images = len(uploaded_files) if uploaded_files else 1
+                        status_text.empty()
+                        progress_bar.empty()
+                        
                         st.success(f"✅ Quiz đã được tạo từ {num_images} ảnh với tổng cộng {len(quiz_data.questions)} câu hỏi!")
+                        st.info(f"⏱️ Thời gian xử lý: {processing_time:.1f} giây (xử lý song song)")
                         
                     except Exception as e:
+                        progress_bar.empty()
+                        status_text.empty()
                         st.error(f"❌ Lỗi khi tạo quiz: {str(e)}")
     
     # Display quiz if available
