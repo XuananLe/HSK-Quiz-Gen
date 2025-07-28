@@ -69,8 +69,14 @@ class QuizQuestion(BaseModel):
     
     @field_validator('wrong_meanings')
     def validate_wrong_meanings(cls, v):
-        # Clean up wrong meanings
-        cleaned_meanings = [meaning.strip() for meaning in v if meaning.strip()]
+        # Clean up wrong meanings and remove duplicates
+        cleaned_meanings = []
+        seen = set()
+        for meaning in v:
+            meaning_clean = meaning.strip()
+            if meaning_clean and meaning_clean.lower() not in seen:
+                cleaned_meanings.append(meaning_clean)
+                seen.add(meaning_clean.lower())
         return cleaned_meanings
     
     @property
@@ -98,6 +104,7 @@ class QuizData(BaseModel):
         if 0 <= index < len(self.questions):
             return self.questions[index]
         return None
+
 
 def generate_single_quiz(image_file, image_index):
     """Generate quiz from a single image - helper function for parallel processing"""
@@ -136,7 +143,11 @@ def generate_single_quiz(image_file, image_index):
                                 "  * meaning: nghĩa tiếng Việt đúng "
                                 "  * wrong_meanings: 3-4 nghĩa sai để tạo multiple choice "
                                 "  * explanation: giải thích thêm về từ (nếu có) "
-                                "Ví dụ: question='Pinyin và nghĩa của từ 学生 là gì?', chinese_word='学生', pinyin='xuéshēng', meaning='học sinh', wrong_meanings=['giáo viên', 'bạn bè', 'gia đình']"
+                                "Lưu ý quan trọng:"
+                                "1. Mỗi câu hỏi phải có wrong_meanings riêng biệt, không được sử dụng lại wrong_meanings ở các câu khác"
+                                "2. Các nghĩa sai phải khác hoàn toàn với nghĩa đúng"
+                                "3. Hãy tạo nghĩa sai liên quan đến ngữ cảnh của từ, không chỉ chọn nghĩa ngẫu nhiên"
+                                "4. Tránh sử dụng lại các nghĩa sai giống nhau ở các câu hỏi khác nhau"
                             )
                         },
                         {
@@ -163,6 +174,7 @@ def generate_single_quiz(image_file, image_index):
         )
         error_quiz = QuizData(questions=[error_question], title=f"Lỗi - Ảnh {image_index+1}")
         return error_quiz, image_index, str(e)
+
 
 def generate_quiz_from_images(image_files):
     """Generate quiz from multiple images using parallel processing"""
@@ -194,9 +206,24 @@ def generate_quiz_from_images(image_files):
     question_id = 1
     titles = []
     
+    # Keep track of used wrong meanings to avoid duplicates
+    used_wrong_meanings = set()
+    
     for quiz_data in all_quiz_data:
         titles.append(quiz_data.title)
         for question in quiz_data.questions:
+            # Ensure wrong_meanings don't overlap with previously used ones
+            filtered_wrong_meanings = []
+            for meaning in question.wrong_meanings:
+                if meaning.lower() not in used_wrong_meanings and meaning.lower() != question.meaning.lower():
+                    filtered_wrong_meanings.append(meaning)
+                    used_wrong_meanings.add(meaning.lower())
+            
+            # If we filtered out too many, we need to generate some new ones
+            if len(filtered_wrong_meanings) < 3 and len(filtered_wrong_meanings) < len(question.wrong_meanings):
+                # Keep what we have and just update the question's wrong_meanings
+                question.wrong_meanings = filtered_wrong_meanings
+            
             question.id = question_id
             combined_questions.append(question)
             question_id += 1
