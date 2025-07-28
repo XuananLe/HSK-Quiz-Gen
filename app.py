@@ -31,6 +31,10 @@ class QuestionType(str, Enum):
     MULTIPLE_CHOICE = "multiple_choice"
     TEXT_INPUT = "text_input"
     TRUE_FALSE = "true_false"
+    GAP_FILLING = "gap_filling"
+    DIALOGUE_ARRANGEMENT = "dialogue_arrangement"
+    READING_COMPREHENSION = "reading_comprehension"
+    CHINESE_TO_PINYIN_MEANING = "chinese_to_pinyin_meaning"
 
 class QuizQuestion(BaseModel):
     """Structured representation of a quiz question"""
@@ -42,6 +46,22 @@ class QuizQuestion(BaseModel):
     meaning: str = Field(..., description="Vietnamese/English meaning")
     wrong_meanings: List[str] = Field(default=[], description="Wrong meaning options for multiple choice")
     explanation: Optional[str] = Field(default="", description="Additional explanation")
+    
+    # Fields for gap filling questions
+    context_sentence: Optional[str] = Field(default="", description="Full sentence with gap for gap filling")
+    options: List[str] = Field(default=[], description="Options for gap filling or dialogue arrangement")
+    correct_answer: Optional[str] = Field(default="", description="Correct answer for gap filling")
+    hsk_level: Optional[int] = Field(default=4, description="HSK level of the vocabulary used")
+    
+    # Fields for dialogue arrangement
+    dialogue_parts: List[str] = Field(default=[], description="Parts of dialogue for arrangement")
+    correct_order: List[int] = Field(default=[], description="Correct order of dialogue parts")
+    
+    # Fields for reading comprehension
+    reading_text: Optional[str] = Field(default="", description="Text for reading comprehension")
+    subquestions: List[str] = Field(default=[], description="Questions about the reading text")
+    subanswers: List[str] = Field(default=[], description="Answers to the subquestions")
+    suboptions: List[List[str]] = Field(default=[], description="Options for each subquestion")
     
     @field_validator('question')
     def question_must_not_be_empty(cls, v):
@@ -82,7 +102,21 @@ class QuizQuestion(BaseModel):
     @property
     def all_meaning_options(self) -> List[str]:
         """Get all meaning options (correct + wrong) shuffled"""
-        options = [self.meaning] + self.wrong_meanings
+        # Ensure we always have at least 3 wrong meanings
+        if len(self.wrong_meanings) < 3:
+            backup_options = ["học sinh", "giáo viên", "bạn bè", "gia đình", "thời gian", "từ khác"]
+            additional_options = []
+            for option in backup_options:
+                if len(self.wrong_meanings) + len(additional_options) >= 3:
+                    break
+                if option.lower() not in [m.lower() for m in self.wrong_meanings] and option.lower() != self.meaning.lower():
+                    additional_options.append(option)
+            
+            # Create and shuffle options
+            options = [self.meaning] + self.wrong_meanings + additional_options
+        else:
+            options = [self.meaning] + self.wrong_meanings
+        
         random.shuffle(options)
         return options
 
@@ -128,13 +162,16 @@ def generate_single_quiz(image_file, image_index):
                             "type": "text",
                             "text": (
                                 "Bạn là giáo viên tiếng Trung. Đây là ảnh chụp một trang ghi chú gồm từ Hán, pinyin, loại từ, và nghĩa tiếng Việt. "
-                                "Hãy tạo 8–12 câu hỏi quiz theo format sau: "
-                                "- Hiển thị từ tiếng Trung (Hán tự) "
-                                "- Học sinh cần điền pinyin (text input) "
-                                "- Học sinh chọn nghĩa đúng từ các lựa chọn (multiple choice) "
+                                "Hãy tạo 8-12 câu hỏi quiz với các dạng bài tập khác nhau: "
+                                "- Dạng 1: Hiển thị từ tiếng Trung → Học sinh điền pinyin + chọn nghĩa đúng (4-6 câu)"
+                                "- Dạng 2: Điền từ vào chỗ trống, sử dụng từ vựng ở HSK level 4 (1-2 câu)"
+                                "- Dạng 3: Sắp xếp hội thoại theo thứ tự đúng (0-1 câu)"
+                                "- Dạng 4: Đọc hiểu văn bản ngắn và trả lời câu hỏi (0-1 câu)"
                                 "Trả về dữ liệu có cấu trúc với: "
                                 "- title: tên bài quiz (dựa trên nội dung ảnh) "
-                                "- questions: danh sách câu hỏi, mỗi câu có: "
+                                "- questions: danh sách câu hỏi, mỗi câu có các trường tùy theo loại câu hỏi: "
+                                ""
+                                "1. Đối với câu hỏi pinyin và nghĩa (type: 'chinese_to_pinyin_meaning'):"
                                 "  * id: số thứ tự "
                                 "  * type: 'chinese_to_pinyin_meaning' "
                                 "  * question: câu hỏi dạng 'Pinyin và nghĩa của từ [từ tiếng Trung] là gì?' "
@@ -142,6 +179,41 @@ def generate_single_quiz(image_file, image_index):
                                 "  * pinyin: cách đọc pinyin đúng "
                                 "  * meaning: nghĩa tiếng Việt đúng "
                                 "  * wrong_meanings: 3-4 nghĩa sai để tạo multiple choice "
+                                ""
+                                "2. Đối với câu hỏi điền vào chỗ trống (type: 'gap_filling'):"
+                                "  * id: số thứ tự"
+                                "  * type: 'gap_filling'"
+                                "  * question: Câu hỏi dạng 'Chọn từ phù hợp để điền vào chỗ trống'"
+                                "  * context_sentence: Câu hoàn chỉnh với '___ ' là chỗ cần điền"
+                                "  * options: 4 lựa chọn từ để điền"
+                                "  * correct_answer: Từ đúng để điền vào chỗ trống"
+                                "  * chinese_word: Từ đúng để điền (giống correct_answer)"
+                                "  * pinyin: Pinyin của từ đúng"
+                                "  * meaning: Nghĩa của từ đúng"
+                                "  * hsk_level: 4 (hoặc cấp độ HSK của từ vựng)"
+                                ""
+                                "3. Đối với câu hỏi sắp xếp hội thoại (type: 'dialogue_arrangement'):"
+                                "  * id: số thứ tự"
+                                "  * type: 'dialogue_arrangement'"
+                                "  * question: 'Sắp xếp các phần của hội thoại theo thứ tự đúng'"
+                                "  * dialogue_parts: Mảng các phần của hội thoại (3-5 phần)"
+                                "  * correct_order: Mảng các số nguyên thể hiện thứ tự đúng [0, 1, 2, ...]"
+                                "  * chinese_word: Chủ đề của hội thoại"
+                                "  * pinyin: Pinyin của chủ đề"
+                                "  * meaning: Nghĩa của chủ đề"
+                                ""
+                                "4. Đối với câu hỏi đọc hiểu (type: 'reading_comprehension'):"
+                                "  * id: số thứ tự"
+                                "  * type: 'reading_comprehension'"
+                                "  * question: '阅读理解 (Đọc hiểu)'"
+                                "  * reading_text: Nội dung đoạn văn dài (150-250 từ) bằng tiếng Trung (HSK 4-5), có thể có đoạn văn đối thoại hoặc văn xuôi"
+                                "  * subquestions: Mảng các câu hỏi con bằng tiếng Trung về nội dung đoạn văn (2-4 câu hỏi)"
+                                "  * suboptions: Mảng các mảng lựa chọn bằng tiếng Trung cho từng câu hỏi con"
+                                "  * subanswers: Mảng các đáp án đúng cho từng câu hỏi con"
+                                "  * chinese_word: Tiêu đề của đoạn văn"
+                                "  * pinyin: Pinyin của tiêu đề"
+                                "  * meaning: Nghĩa của tiêu đề"
+                                "  * explanation: Giải thích các từ khó hoặc ngữ pháp phức tạp trong bài đọc"
                                 "  * explanation: giải thích thêm về từ (nếu có) "
                                 "Lưu ý quan trọng:"
                                 "1. Mỗi câu hỏi phải có wrong_meanings riêng biệt, không được sử dụng lại wrong_meanings ở các câu khác"
@@ -219,10 +291,29 @@ def generate_quiz_from_images(image_files):
                     filtered_wrong_meanings.append(meaning)
                     used_wrong_meanings.add(meaning.lower())
             
-            # If we filtered out too many, we need to generate some new ones
-            if len(filtered_wrong_meanings) < 3 and len(filtered_wrong_meanings) < len(question.wrong_meanings):
-                # Keep what we have and just update the question's wrong_meanings
-                question.wrong_meanings = filtered_wrong_meanings
+            # Make sure we have at least 3 wrong meanings
+            if len(filtered_wrong_meanings) < 3:
+                # Generate some new meanings that are different from the correct one
+                # and from each other
+                common_wrong_options = [
+                    "học sinh", "giáo viên", "bạn bè", "gia đình", "cuộc sống",
+                    "công việc", "thời gian", "nhà cửa", "tình yêu", "thức ăn",
+                    "nước uống", "sức khỏe", "tiền bạc", "giao thông", "du lịch",
+                    "đi lại", "ngôn ngữ", "học tập", "tình cảm", "hạnh phúc"
+                ]
+                
+                # Add meanings from our common options that don't conflict
+                for meaning in common_wrong_options:
+                    if len(filtered_wrong_meanings) >= 3:
+                        break
+                    if (meaning.lower() not in used_wrong_meanings and 
+                        meaning.lower() != question.meaning.lower() and
+                        meaning not in filtered_wrong_meanings):
+                        filtered_wrong_meanings.append(meaning)
+                        used_wrong_meanings.add(meaning.lower())
+            
+            # Update the question's wrong meanings with our filtered list
+            question.wrong_meanings = filtered_wrong_meanings
             
             question.id = question_id
             combined_questions.append(question)
@@ -232,6 +323,17 @@ def generate_quiz_from_images(image_files):
     if len(titles) > 3:
         combined_title += f" và {len(titles) - 3} ảnh khác"
     
+    # Final check to ensure all questions have at least 3 wrong meanings
+    for question in combined_questions:
+        if question.type == "chinese_to_pinyin_meaning" and len(question.wrong_meanings) < 3:
+            # Add some generic wrong answers if needed
+            generic_wrong = ["từ khác", "nghĩa khác", "không có nghĩa này", "nghĩa sai"]
+            for wrong in generic_wrong:
+                if len(question.wrong_meanings) >= 3:
+                    break
+                if wrong.lower() not in [m.lower() for m in question.wrong_meanings] and wrong.lower() != question.meaning.lower():
+                    question.wrong_meanings.append(wrong)
+    
     return QuizData(questions=combined_questions, title=combined_title)
 
 def generate_quiz_from_image(image_file):
@@ -239,10 +341,30 @@ def generate_quiz_from_image(image_file):
     return generate_quiz_from_images([image_file])
 
 def display_question(question: QuizQuestion, question_num: int) -> bool:
-    """Display a question showing Chinese word and asking for pinyin + meaning"""
+    """Display a question based on its type"""
     st.subheader(f"Câu hỏi {question_num}")
     st.write(f"**Loại:** {question.type}")
     
+    correct = False
+    
+    # Handle different question types
+    if question.type == "chinese_to_pinyin_meaning":
+        correct = display_pinyin_meaning_question(question, question_num)
+    elif question.type == "gap_filling":
+        correct = display_gap_filling_question(question, question_num)
+    elif question.type == "dialogue_arrangement":
+        correct = display_dialogue_arrangement_question(question, question_num)
+    elif question.type == "reading_comprehension":
+        correct = display_reading_comprehension_question(question, question_num)
+    else:
+        # Default to pinyin and meaning question type
+        correct = display_pinyin_meaning_question(question, question_num)
+    
+    st.write("---")
+    return correct
+
+def display_pinyin_meaning_question(question: QuizQuestion, question_num: int) -> bool:
+    """Display a question showing Chinese word and asking for pinyin + meaning"""
     # Display the Chinese word prominently
     st.markdown(f"### 🇨🇳 **{question.chinese_word}**")
     st.write(f"**Câu hỏi:** {question.question}")
@@ -263,7 +385,20 @@ def display_question(question: QuizQuestion, question_num: int) -> bool:
         st.write("**2. Chọn nghĩa đúng:**")
         # Get shuffled options for this question instance
         if f"options_{question.id}" not in st.session_state:
-            st.session_state[f"options_{question.id}"] = question.all_meaning_options
+            # Make sure we have at least 4 options (1 correct + 3 wrong)
+            if len(question.wrong_meanings) < 3:
+                # Add backup options if needed
+                backup_options = ["học sinh", "giáo viên", "bạn bè", "gia đình", "thời gian", "từ khác"]
+                for option in backup_options:
+                    if len(question.wrong_meanings) >= 3:
+                        break
+                    if option.lower() not in [m.lower() for m in question.wrong_meanings] and option.lower() != question.meaning.lower():
+                        question.wrong_meanings.append(option)
+            
+            # Create and shuffle options
+            options = [question.meaning] + question.wrong_meanings[:3]
+            random.shuffle(options)
+            st.session_state[f"options_{question.id}"] = options
         
         meaning_options = st.session_state[f"options_{question.id}"]
         user_meaning = st.radio(
@@ -272,6 +407,9 @@ def display_question(question: QuizQuestion, question_num: int) -> bool:
             key=f"meaning_{question.id}",
             label_visibility="collapsed"
         )
+        
+        # For debugging, show the number of options
+        st.caption(f"Số lựa chọn: {len(meaning_options)}")
     
     correct = False
     
@@ -309,8 +447,183 @@ def display_question(question: QuizQuestion, question_num: int) -> bool:
         if question.explanation:
             st.info(f"💡 **Giải thích:** {question.explanation}")
     
-    st.write("---")
     return correct
+
+def display_gap_filling_question(question: QuizQuestion, question_num: int) -> bool:
+    """Display a gap filling question with options"""
+    st.markdown(f"### 🇨🇳 Điền từ vào chỗ trống (HSK {question.hsk_level})")
+    
+    # Display the context sentence with a gap
+    context_with_highlight = question.context_sentence.replace("___", "**___**")
+    st.write(f"**Câu:** {context_with_highlight}")
+    
+    # Display options
+    st.write("**Chọn từ phù hợp để điền vào chỗ trống:**")
+    
+    # Get shuffled options for this question instance
+    if f"gap_options_{question.id}" not in st.session_state:
+        options_copy = question.options.copy()
+        random.shuffle(options_copy)
+        st.session_state[f"gap_options_{question.id}"] = options_copy
+    
+    user_answer = st.radio(
+        "Lựa chọn:",
+        st.session_state[f"gap_options_{question.id}"],
+        key=f"gap_{question.id}",
+        label_visibility="collapsed"
+    )
+    
+    correct = False
+    
+    if st.button(f"Kiểm tra câu {question_num}", key=f"check_gap_{question.id}"):
+        if user_answer == question.correct_answer:
+            st.success("✅ Đúng rồi!")
+            correct = True
+        else:
+            st.error("❌ Sai rồi!")
+        
+        # Show the complete answer
+        st.info("📖 **Đáp án đầy đủ:**")
+        filled_sentence = question.context_sentence.replace("___", f"**{question.correct_answer}**")
+        st.write(f"Câu đầy đủ: {filled_sentence}")
+        
+        if question.explanation:
+            st.info(f"💡 **Giải thích:** {question.explanation}")
+            
+        # Show info about the correct word
+        st.write(f"**Từ đúng:** {question.correct_answer}")
+        st.write(f"**Pinyin:** {question.pinyin}")
+        st.write(f"**Nghĩa:** {question.meaning}")
+    
+    return correct
+
+def display_dialogue_arrangement_question(question: QuizQuestion, question_num: int) -> bool:
+    """Display a dialogue arrangement question"""
+    st.markdown(f"### 🇨🇳 Sắp xếp hội thoại theo thứ tự đúng")
+    st.write(f"**{question.question}**")
+    
+    # Prepare dialogue parts for arrangement
+    if f"dialogue_parts_{question.id}" not in st.session_state:
+        dialogue_parts_with_index = [(i, part) for i, part in enumerate(question.dialogue_parts)]
+        random.shuffle(dialogue_parts_with_index)
+        st.session_state[f"dialogue_parts_{question.id}"] = dialogue_parts_with_index
+        st.session_state[f"dialogue_order_{question.id}"] = []
+    
+    # Display current order
+    st.write("**Đã sắp xếp:**")
+    order_cols = st.columns(len(st.session_state[f"dialogue_order_{question.id}"]) + 1)
+    
+    for i, idx in enumerate(st.session_state[f"dialogue_order_{question.id}"]):
+        with order_cols[i]:
+            st.text_area(
+                f"Phần {i+1}",
+                question.dialogue_parts[idx],
+                height=100,
+                key=f"arranged_{question.id}_{i}",
+                disabled=True
+            )
+    
+    # Display remaining parts
+    st.write("**Các phần còn lại:**")
+    remaining_parts = [p for p in st.session_state[f"dialogue_parts_{question.id}"] 
+                      if p[0] not in st.session_state[f"dialogue_order_{question.id}"]]
+    
+    if remaining_parts:
+        remaining_cols = st.columns(min(3, len(remaining_parts)))
+        for i, (idx, part) in enumerate(remaining_parts):
+            with remaining_cols[i % len(remaining_cols)]:
+                st.text_area(
+                    f"Phần {i+1}",
+                    part,
+                    height=100,
+                    key=f"remaining_{question.id}_{i}",
+                    disabled=True
+                )
+                if st.button(f"Thêm phần này", key=f"add_{question.id}_{i}"):
+                    st.session_state[f"dialogue_order_{question.id}"].append(idx)
+                    st.rerun()
+    
+    # Reset button
+    if st.button("Reset", key=f"reset_{question.id}"):
+        st.session_state[f"dialogue_order_{question.id}"] = []
+        st.rerun()
+    
+    correct = False
+    
+    if st.button(f"Kiểm tra câu {question_num}", key=f"check_dialogue_{question.id}"):
+        user_order = st.session_state[f"dialogue_order_{question.id}"]
+        if user_order == question.correct_order:
+            st.success("✅ Đúng rồi! Bạn đã sắp xếp đúng thứ tự!")
+            correct = True
+        else:
+            st.error("❌ Sai rồi! Thứ tự đúng là:")
+            # Display correct order
+            correct_cols = st.columns(len(question.correct_order))
+            for i, idx in enumerate(question.correct_order):
+                with correct_cols[i]:
+                    st.text_area(
+                        f"Phần {i+1} (đúng)",
+                        question.dialogue_parts[idx],
+                        height=100,
+                        key=f"correct_{question.id}_{i}",
+                        disabled=True
+                    )
+        
+        if question.explanation:
+            st.info(f"💡 **Giải thích:** {question.explanation}")
+    
+    return correct
+
+def display_reading_comprehension_question(question: QuizQuestion, question_num: int) -> bool:
+    """Display a reading comprehension question with subquestions"""
+    st.markdown(f"### 🇨🇳 阅读理解 (Đọc hiểu)")
+    
+    # Display the reading text in a larger container
+    with st.expander("点击展开阅读文章 (Nhấn để xem bài đọc)", expanded=True):
+        st.markdown(f"""
+        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; border-left: 5px solid #1E88E5;">
+        {question.reading_text}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Display subquestions (in Chinese)
+    all_correct = True
+    user_answers = []
+    
+    for i, subq in enumerate(question.subquestions):
+        st.write(f"**问题 {i+1}:** {subq}")
+        
+        # Get options for this subquestion
+        options = question.suboptions[i] if i < len(question.suboptions) else []
+        
+        user_answer = st.radio(
+            f"Câu {i+1}",
+            options,
+            key=f"subq_{question.id}_{i}",
+            label_visibility="collapsed"
+        )
+        
+        user_answers.append(user_answer)
+    
+    if st.button(f"检查答案 (Kiểm tra)", key=f"check_reading_{question.id}"):
+        st.write("### 结果 (Kết quả):")
+        
+        for i, (user_ans, correct_ans) in enumerate(zip(user_answers, question.subanswers)):
+            if user_ans == correct_ans:
+                st.success(f"问题 {i+1}: ✅ 正确! (Đúng!)")
+            else:
+                st.error(f"问题 {i+1}: ❌ 错误! 正确答案是: {correct_ans} (Sai! Đáp án đúng là: {correct_ans})")
+                all_correct = False
+        
+        if all_correct:
+            st.success("🎉 恭喜你! 你已经正确回答了所有问题! (Chúc mừng! Bạn đã trả lời đúng tất cả các câu hỏi!)")
+        else:
+            st.warning("你还没有正确回答所有问题。请再试一次! (Bạn chưa trả lời đúng tất cả các câu hỏi. Hãy thử lại!)")
+        
+        if question.explanation:
+            st.info(f"💡 **解释 (Giải thích):** {question.explanation}")
+    
+    return all_correct
 
 def main():
     st.set_page_config(
@@ -472,7 +785,32 @@ def main():
                 quiz_text += f"Question: {question.question}\n"
                 quiz_text += f"Correct Pinyin: {question.pinyin}\n"
                 quiz_text += f"Correct Meaning: {question.meaning}\n"
-                quiz_text += f"Wrong Options: {', '.join(question.wrong_meanings)}\n"
+                
+                # Type-specific fields
+                if question.type == "chinese_to_pinyin_meaning":
+                    quiz_text += f"Wrong Options: {', '.join(question.wrong_meanings)}\n"
+                
+                elif question.type == "gap_filling":
+                    quiz_text += f"Context Sentence: {question.context_sentence}\n"
+                    quiz_text += f"Options: {', '.join(question.options)}\n"
+                    quiz_text += f"Correct Answer: {question.correct_answer}\n"
+                    quiz_text += f"HSK Level: {question.hsk_level}\n"
+                
+                elif question.type == "dialogue_arrangement":
+                    quiz_text += "Dialogue Parts:\n"
+                    for j, part in enumerate(question.dialogue_parts):
+                        quiz_text += f"  Part {j+1}: {part}\n"
+                    quiz_text += f"Correct Order: {question.correct_order}\n"
+                
+                elif question.type == "reading_comprehension":
+                    quiz_text += "Reading Text:\n"
+                    quiz_text += f"{question.reading_text}\n\n"
+                    quiz_text += "Subquestions:\n"
+                    for j, (subq, ans) in enumerate(zip(question.subquestions, question.subanswers)):
+                        quiz_text += f"  {j+1}. {subq}\n"
+                        quiz_text += f"     Answer: {ans}\n"
+                        if j < len(question.suboptions):
+                            quiz_text += f"     Options: {', '.join(question.suboptions[j])}\n"
                 
                 if question.explanation:
                     quiz_text += f"Explanation: {question.explanation}\n"
